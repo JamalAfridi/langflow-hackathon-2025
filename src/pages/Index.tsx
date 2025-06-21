@@ -2,8 +2,8 @@
 import ConversationComponent, {
   ConversationHandle,
 } from '@/components/Conversation'
-import {Button} from '@/components/ui/button'
-import {useAuth} from '@/contexts/AuthContext'
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   AlertCircle,
   Baby,
@@ -15,7 +15,7 @@ import {
   Settings,
 } from 'lucide-react'
 import Link from 'next/link'
-import {useRef, useState} from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface LangflowAnalysis {
   success: boolean
@@ -32,10 +32,20 @@ const IndexPage = () => {
   const [langflowAnalysis, setLangflowAnalysis] =
     useState<LangflowAnalysis | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const {user} = useAuth()
+  const { user } = useAuth()
   console.log(user)
-  console.log('SUPABASE_URL:', process.env.SUPABASE_URL)
-  console.log('SUPABASE_ANON_KEY:', !!process.env.SUPABASE_ANON_KEY)
+  const [showModal, setShowModal] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [childForSms, setChildForSms] = useState('');
+  const [smsStatus, setSmsStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+
+  // Trigger modal 5 seconds after entering summary
+  useEffect(() => {
+    if (currentPage === 'summary') {
+      const timer = setTimeout(() => setShowModal(true), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentPage]);
 
   const handleMicToggle = async () => {
     const connected = convoRef.current?.status === 'connected'
@@ -52,6 +62,21 @@ const IndexPage = () => {
     setIsListening(!isListening)
     setIsListening(!connected)
   }
+
+  const sendSms = async () => {
+    setSmsStatus('sending');
+    const res = await fetch('/api/send-sms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: phone,
+        childName: childForSms || undefined,
+        summary: langflowAnalysis?.extractedMessage
+      }),
+    });
+    if (res.ok) setSmsStatus('sent');
+    else setSmsStatus('error');
+  };
 
   const handleTranscriptProcessed = (result: {
     success: boolean
@@ -193,9 +218,8 @@ const IndexPage = () => {
       {/* Dr. Wobble Avatar */}
       <div className="flex-1 flex flex-col items-center justify-center space-y-8">
         <div
-          className={`relative transition-all duration-500 ${
-            isListening ? 'scale-110' : 'scale-100'
-          }`}
+          className={`relative transition-all duration-500 ${isListening ? 'scale-110' : 'scale-100'
+            }`}
         >
           <div className="w-40 h-40 bg-gradient-to-br from-yellow-300 to-orange-400 rounded-full flex items-center justify-center shadow-2xl">
             <div className="text-8xl animate-bounce">🥼</div>
@@ -216,8 +240,8 @@ const IndexPage = () => {
             {isAnalyzing
               ? 'Let me think about what you told me... 🤔'
               : isListening
-              ? "I'm listening carefully... 👂"
-              : 'Hi there! How are you feeling today? Tap the button and tell me!'}
+                ? "I'm listening carefully... 👂"
+                : 'Hi there! How are you feeling today? Tap the button and tell me!'}
           </p>
         </div>
 
@@ -225,13 +249,12 @@ const IndexPage = () => {
         <Button
           onClick={handleMicToggle}
           disabled={isAnalyzing}
-          className={`w-24 h-24 rounded-full shadow-xl transition-all duration-300 ${
-            isAnalyzing
-              ? 'bg-yellow-500 animate-pulse cursor-not-allowed'
-              : isListening
+          className={`w-24 h-24 rounded-full shadow-xl transition-all duration-300 ${isAnalyzing
+            ? 'bg-yellow-500 animate-pulse cursor-not-allowed'
+            : isListening
               ? 'bg-red-500 hover:bg-red-600 animate-pulse'
               : 'bg-green-500 hover:bg-green-600'
-          }`}
+            }`}
         >
           <Mic className="w-8 h-8 text-white" />
         </Button>
@@ -301,8 +324,8 @@ const IndexPage = () => {
                   {langflowAnalysis?.success
                     ? '📋'
                     : langflowAnalysis?.error
-                    ? '⚠️'
-                    : '📋'}
+                      ? '⚠️'
+                      : '📋'}
                 </div>
               </div>
               <h3 className="text-xl font-bold text-gray-800">
@@ -505,6 +528,49 @@ const IndexPage = () => {
       {currentPage === 'welcome' && <WelcomePage />}
       {currentPage === 'talk' && <TalkPage />}
       {currentPage === 'summary' && <SummaryPage />}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4">
+            <h2 className="text-xl font-bold">Send Summary via SMS?</h2>
+            <p>Enter your phone number to receive the check-up summary.</p>
+            <input
+              type="tel"
+              placeholder="+1234567890"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+            <input
+              type="text"
+              placeholder="Child’s Name (optional)"
+              value={childForSms}
+              onChange={e => setChildForSms(e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-gray-700 rounded hover:bg-gray-100"
+              >
+                No thanks
+              </button>
+              <button
+                onClick={sendSms}
+                disabled={smsStatus === 'sending'}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {smsStatus === 'sending' ? 'Sending…' : 'Yes, send SMS'}
+              </button>
+            </div>
+            {smsStatus === 'sent' && (
+              <p className="text-green-600">✅ SMS sent!</p>
+            )}
+            {smsStatus === 'error' && (
+              <p className="text-red-600">❌ Failed to send SMS</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
