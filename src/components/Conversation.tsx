@@ -1,77 +1,121 @@
 // app/components/Conversation.tsx
-'use client';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { useConversation } from '@elevenlabs/react';
-import {
-  forwardRef,
-  useCallback,
-  useImperativeHandle,
-  useEffect,
-  useRef,
-} from 'react';
+'use client'
+import {Button} from '@/components/ui/button'
+import {useAuth} from '@/contexts/AuthContext'
+import {supabase} from '@/integrations/supabase/client'
+import {useConversation} from '@elevenlabs/react'
+import {forwardRef, useCallback, useImperativeHandle, useRef} from 'react'
+
+interface ConversationMessage {
+  readonly role: 'user' | 'ai'
+  readonly message: string
+}
+
+interface ElevenLabsMessage {
+  readonly source: 'agent' | 'user'
+  readonly message: string
+}
 
 export interface ConversationHandle {
-  start: () => Promise<void>;
-  stop: () => Promise<void>;
-  status: string;
-  isSpeaking: boolean;
+  start: () => Promise<void>
+  stop: () => Promise<void>
+  setVolume: (volume: number) => Promise<void>
+  status: string
+  isSpeaking: boolean
 }
 
 const ConversationComponent = forwardRef<ConversationHandle>((_, ref) => {
-  const {user} = useAuth();
-  const buffer = useRef<{ role: 'user' | 'ai'; message: string }[]>([]);
+  const {user} = useAuth()
+  const buffer = useRef<ConversationMessage[]>([])
   const conversation = useConversation({
     onConnect: () => console.log('Connected'),
     onDisconnect: async () => {
-      console.log("DIsconnected");
+      console.log('Disconnected')
       // when disconnected, send the buffer to the server
-      console.log('Sending buffer to server:', buffer.current);
+      console.log('Sending buffer to server:', buffer.current)
       // if there are messages in the buffer, send them to the server
-      if (buffer.current.length ) {
+      if (buffer.current.length > 0) {
         const summaryText = buffer.current
-        .map(t => 
-          // use backticks around the whole string so ${…} works
-          `${t.role === 'user' ? 'Child' : 'Dr Wobble'}: ${t.message}`
-        )
-        .join('\n');
-        console.log('Summary text:', summaryText);
-        // const { data: { session } } = await supabase.auth.getSession();
-        // await fetch('/api/conversation', {
-        //   method: 'POST',
-        //   headers: {
-        //     'Content-Type': 'application/json',
-        //     'Authorization': `Bearer ${session?.access_token}`,
-        //   },
-        //   body: JSON.stringify({
-        //     transcript: buffer.current        // send whole array
-        //   }),
-        // });
-        // buffer.current = []; // reset for next call
+          .map(
+            t =>
+              // use backticks around the whole string so ${…} works
+              `${t.role === 'user' ? 'Child' : 'Dr Wobble'}: ${t.message}`,
+          )
+          .join('\n')
+        console.log('Summary text:', summaryText)
+
+        try {
+          const {
+            data: {session},
+          } = await supabase.auth.getSession()
+          await fetch('/api/conversation', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({
+              transcript: buffer.current, // send whole array
+            }),
+          })
+          buffer.current = [] // reset for next call
+        } catch (error) {
+          console.error('Failed to save conversation:', error)
+        }
       }
     },
-    onMessage: (msg) => {
-      // push every turn to the buffer
-      buffer.current.push({ role: msg.source as 'user' | 'ai', message: msg.message });
-
+    onMessage: (msg: ElevenLabsMessage) => {
+      // Map ElevenLabs message source to our buffer role
+      // ElevenLabs uses 'agent' and 'user', we use 'ai' and 'user'
+      const role = msg.source === 'agent' ? 'ai' : 'user'
+      buffer.current.push({role, message: msg.message})
     },
-    onError: (err) => console.error('Error', err),
-  });
+    onError: err => console.error('Error', err),
+  })
 
   // ---- start / stop impl ---------------------------------------------------
   const start = useCallback(async () => {
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      await conversation.startSession({ agentId: 'agent_01jy85t07ae65tgp6wbz25dwye' });
+      // Request microphone permission first
+      await navigator.mediaDevices.getUserMedia({audio: true})
+
+      const agentId =
+        process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID ||
+        'agent_01jy85t07ae65tgp6wbz25dwye'
+
+      if (!agentId) {
+        throw new Error('Agent ID is required but not configured')
+      }
+
+      await conversation.startSession({agentId})
     } catch (err) {
-      console.error('Failed to start conversation:', err);
+      if (err instanceof DOMException) {
+        if (err.name === 'NotAllowedError') {
+          console.error('Microphone access denied by user')
+        } else if (err.name === 'NotFoundError') {
+          console.error('No microphone found on device')
+        } else {
+          console.error('Microphone access error:', err.message)
+        }
+      } else {
+        console.error('Failed to start conversation:', err)
+      }
+      throw err // Re-throw so parent components can handle it
     }
-  }, [conversation]);
+  }, [conversation])
 
   const stop = useCallback(async () => {
-    await conversation.endSession();
-  }, [conversation]);
+    await conversation.endSession()
+  }, [conversation])
+
+  const setVolume = useCallback(
+    async (volume: number) => {
+      // Clamp volume between 0 and 1
+      const clampedVolume = Math.max(0, Math.min(1, volume))
+      await conversation.setVolume({volume: clampedVolume})
+    },
+    [conversation],
+  )
 
   // ---- expose methods to parent -------------------------------------------
   useImperativeHandle(
@@ -79,17 +123,18 @@ const ConversationComponent = forwardRef<ConversationHandle>((_, ref) => {
     () => ({
       start,
       stop,
+      setVolume,
       get status() {
-        return conversation.status;
+        return conversation.status
       },
       get isSpeaking() {
-        return conversation.isSpeaking;
+        return conversation.isSpeaking
       },
     }),
-    [start, stop, conversation.status, conversation.isSpeaking],
-  );
+    [start, stop, setVolume, conversation.status, conversation.isSpeaking],
+  )
 
-  // ---- (optional) hide internal UI if you don’t need it --------------------
+  // ---- (optional) hide internal UI if you don't need it --------------------
   // return null;
 
   return (
@@ -105,8 +150,8 @@ const ConversationComponent = forwardRef<ConversationHandle>((_, ref) => {
         </Button>
       </div>
     </div>
-  );
-});
+  )
+})
 
-ConversationComponent.displayName = 'ConversationComponent';
-export default ConversationComponent;
+ConversationComponent.displayName = 'ConversationComponent'
+export default ConversationComponent
