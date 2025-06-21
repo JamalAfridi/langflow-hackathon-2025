@@ -16,15 +16,31 @@ interface ElevenLabsMessage {
   readonly message: string
 }
 
+interface LangflowApiResult {
+  success: boolean
+  error?: string
+  response_received: boolean
+  extracted_message?: string | null
+  message_length: number
+}
+
+interface ConversationComponentProps {
+  onTranscriptProcessed?: (result: LangflowApiResult) => void
+}
+
 export interface ConversationHandle {
   start: () => Promise<void>
   stop: () => Promise<void>
   setVolume: (volume: number) => Promise<void>
+  getTranscript: () => ConversationMessage[]
   status: string
   isSpeaking: boolean
 }
 
-const ConversationComponent = forwardRef<ConversationHandle>((_, ref) => {
+const ConversationComponent = forwardRef<
+  ConversationHandle,
+  ConversationComponentProps
+>(({onTranscriptProcessed}, ref) => {
   const {user} = useAuth()
   const buffer = useRef<ConversationMessage[]>([])
   const conversation = useConversation({
@@ -48,7 +64,7 @@ const ConversationComponent = forwardRef<ConversationHandle>((_, ref) => {
           const {
             data: {session},
           } = await supabase.auth.getSession()
-          await fetch('/api/conversation', {
+          const response = await fetch('/api/conversation', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -58,10 +74,36 @@ const ConversationComponent = forwardRef<ConversationHandle>((_, ref) => {
               transcript: buffer.current, // send whole array
             }),
           })
+
+          const result = await response.json()
+
+          // Call the callback with the Langflow API result if provided
+          if (onTranscriptProcessed && result.langflow_api) {
+            onTranscriptProcessed(result.langflow_api)
+          }
+
           buffer.current = [] // reset for next call
         } catch (error) {
           console.error('Failed to save conversation:', error)
+
+          // Call the callback with error if provided
+          if (onTranscriptProcessed) {
+            onTranscriptProcessed({
+              success: false,
+              error: 'Failed to process conversation',
+              response_received: false,
+              message_length: 0,
+            })
+          }
         }
+      } else if (onTranscriptProcessed) {
+        // No transcript available
+        onTranscriptProcessed({
+          success: false,
+          error: 'No conversation data available',
+          response_received: false,
+          message_length: 0,
+        })
       }
     },
     onMessage: (msg: ElevenLabsMessage) => {
@@ -117,6 +159,11 @@ const ConversationComponent = forwardRef<ConversationHandle>((_, ref) => {
     [conversation],
   )
 
+  const getTranscript = useCallback((): ConversationMessage[] => {
+    // Return a copy of the current buffer to prevent external mutation
+    return [...buffer.current]
+  }, [])
+
   // ---- expose methods to parent -------------------------------------------
   useImperativeHandle(
     ref,
@@ -124,6 +171,7 @@ const ConversationComponent = forwardRef<ConversationHandle>((_, ref) => {
       start,
       stop,
       setVolume,
+      getTranscript,
       get status() {
         return conversation.status
       },
@@ -131,7 +179,14 @@ const ConversationComponent = forwardRef<ConversationHandle>((_, ref) => {
         return conversation.isSpeaking
       },
     }),
-    [start, stop, setVolume, conversation.status, conversation.isSpeaking],
+    [
+      start,
+      stop,
+      setVolume,
+      getTranscript,
+      conversation.status,
+      conversation.isSpeaking,
+    ],
   )
 
   // ---- (optional) hide internal UI if you don't need it --------------------
