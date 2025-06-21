@@ -70,30 +70,47 @@ const IndexPage = () => {
   }
 
   const parseAnalysisMessage = (message: string) => {
+    console.log('=== PARSING ANALYSIS MESSAGE ===')
+    console.log('Raw message:', message)
+    console.log('Message length:', message.length)
+
     const sections = {
       age: '',
       symptoms: '',
       emotional: '',
       followUp: '',
       summary: '',
+      disclaimer: '',
     }
 
-    // Extract different sections using regex patterns
-    const ageMatch = message.match(/👶 Child's Age:([^•]*)/)
-    const symptomsMatch = message.match(/😷 Symptoms[^:]*:([^•]*?)(?=•|$)/s)
-    const emotionalMatch = message.match(/🧠 Emotional State:([^•]*)/)
-    const summaryMatch = message.match(
-      /🗒️ Friendly Summary[^:]*:([^•]*?)(?=•|$)/s,
+    // Extract different sections using regex patterns that match the actual format
+    // Updated patterns to handle bullet points and the actual message structure
+    const ageMatch = message.match(
+      /• 👶 Child's Age:\s*(.*?)(?=• 😷|• 🧠|• 📌|• 🗒️|• ⚠️|$)/s,
+    )
+    const symptomsMatch = message.match(
+      /• 😷 Symptoms[^:]*:\s*(.*?)(?=• 👶|• 🧠|• 📌|• 🗒️|• ⚠️|$)/s,
+    )
+    const emotionalMatch = message.match(
+      /• 🧠 Emotional State[^:]*:\s*(.*?)(?=• 👶|• 😷|• 📌|• 🗒️|• ⚠️|$)/s,
     )
     const followUpMatch = message.match(
-      /📌 Areas that may be worth following up:([^•]*?)(?=•|$)/s,
+      /• 📌 Areas that may be worth following up:\s*(.*?)(?=• 👶|• 😷|• 🧠|• 🗒️|• ⚠️|$)/s,
     )
+    const summaryMatch = message.match(
+      /• 🗒️ Friendly Summary[^:]*:\s*(.*?)(?=• 👶|• 😷|• 🧠|• 📌|• ⚠️|$)/s,
+    )
+    const disclaimerMatch = message.match(/• ⚠️ Disclaimer[^:]*:\s*(.*?)$/s)
 
     if (ageMatch) sections.age = ageMatch[1].trim()
     if (symptomsMatch) sections.symptoms = symptomsMatch[1].trim()
     if (emotionalMatch) sections.emotional = emotionalMatch[1].trim()
-    if (summaryMatch) sections.summary = summaryMatch[1].trim()
     if (followUpMatch) sections.followUp = followUpMatch[1].trim()
+    if (summaryMatch) sections.summary = summaryMatch[1].trim()
+    if (disclaimerMatch) sections.disclaimer = disclaimerMatch[1].trim()
+
+    console.log('Parsed sections:', sections)
+    console.log('=== END PARSING ===')
 
     return sections
   }
@@ -401,11 +418,34 @@ const IndexPage = () => {
 
                 {/* Disclaimer */}
                 <div className="bg-gray-50 rounded-2xl p-4 border-l-4 border-gray-400">
-                  <p className="text-xs text-gray-500">
-                    ⚠️ This summary is not medical advice. Always consult a
-                    pediatrician or healthcare provider for any concerns about
-                    your child's health.
-                  </p>
+                  <div className="flex items-start space-x-3">
+                    <span className="text-xl">⚠️</span>
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-800">
+                        Important Disclaimer
+                      </p>
+                      <p className="text-gray-600 text-xs">
+                        {analysis.disclaimer ||
+                          "This summary is not medical advice. Always consult a pediatrician or healthcare provider for any concerns about your child's health."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : langflowAnalysis?.success &&
+              langflowAnalysis.extractedMessage ? (
+              // Fallback: Display raw analysis message if parsing fails
+              <div className="bg-blue-50 rounded-2xl p-4">
+                <div className="flex items-start space-x-3">
+                  <span className="text-2xl">📋</span>
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-800">
+                      Dr. Wobble's Analysis
+                    </p>
+                    <div className="text-gray-600 text-sm whitespace-pre-line">
+                      {langflowAnalysis.extractedMessage}
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : langflowAnalysis?.error ? (
@@ -421,7 +461,7 @@ const IndexPage = () => {
                 </div>
               </div>
             ) : (
-              // Fallback to original static content
+              // Fallback to original static content when no langflow analysis
               <div className="space-y-4">
                 <div className="bg-purple-50 rounded-2xl p-4">
                   <div className="flex items-center space-x-3">
