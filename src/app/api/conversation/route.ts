@@ -157,10 +157,11 @@ const extractLangflowMessage = (response: unknown): string | null => {
 }
 
 const formatLangflowOutput = (message: string): string => {
-  // Clean up the message and make it more readable
+  // Clean up the message but preserve structure for parsing
   return message
     .replace(/\*\*(.*?)\*\*/g, '$1') // Remove markdown bold formatting
-    .replace(/- /g, '• ') // Replace dashes with bullet points
+    .replace(/^- /gm, '• ') // Replace dashes with bullet points only at start of lines
+    .replace(/^ {2}- /gm, '  • ') // Replace indented dashes with bullet points
     .trim()
 }
 
