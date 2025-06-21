@@ -61,7 +61,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const secret =
-    "";
+    process.env.ELEVENLABS_WEBHOOK_SECRET;
   const { event, error } = await constructWebhookEvent(req, secret);
 
   if (error) {
