@@ -134,7 +134,9 @@ const IndexPage = () => {
       error: result.error,
     })
     setIsAnalyzing(false)
-    setCurrentPage('summary')
+    if (result.success) {
+      setCurrentPage('summary');
+    }
   }
 
   const parseAnalysisMessage = (message: string) => {
@@ -611,7 +613,7 @@ const IndexPage = () => {
       {currentPage === 'welcome' && <WelcomePage />}
       {currentPage === 'talk' && <TalkPage />}
       {currentPage === 'summary' && <SummaryPage />}
-      {showModal && (
+      {showModal &&langflowAnalysis?.success && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4">
             <h2 className="text-xl font-bold">Send Summary via SMS?</h2>
