@@ -15,6 +15,7 @@ import {
   Settings,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useToast } from '@/hooks/use-toast';
 import { useEffect, useRef, useState } from 'react'
 
 interface LangflowAnalysis {
@@ -38,6 +39,7 @@ const IndexPage = () => {
   const [phone, setPhone] = useState('');
   const [childForSms, setChildForSms] = useState('');
   const [smsStatus, setSmsStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const { toast } = useToast();
 
   // Trigger modal 5 seconds after entering summary
   useEffect(() => {
@@ -64,18 +66,59 @@ const IndexPage = () => {
   }
 
   const sendSms = async () => {
+    if (!phone.trim()) {
+      toast({
+        title: "Phone number required",
+        description: "Please enter a valid phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSmsStatus('sending');
-    const res = await fetch('/api/send-sms', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: phone,
-        childName: childForSms || undefined,
-        summary: langflowAnalysis?.extractedMessage
-      }),
-    });
-    if (res.ok) setSmsStatus('sent');
-    else setSmsStatus('error');
+
+    try {
+      const response = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: phone,
+          childName: childForSms || undefined,
+          summary: langflowAnalysis?.extractedMessage
+        }),
+      });
+
+      if (response.ok) {
+        setSmsStatus('sent');
+
+        // Show success toast
+        toast({
+          title: "SMS sent successfully! 📱",
+          description: `Summary sent to ${phone}`,
+          variant: "default", // or omit for default styling
+        });
+
+        // Close modal after a brief delay
+        setTimeout(() => {
+          setShowModal(false);
+          setSmsStatus('idle'); // Reset status for next time
+        }, 1500);
+
+      } else {
+        throw new Error('Failed to send SMS');
+      }
+    } catch (error) {
+      setSmsStatus('error');
+
+      // Show error toast
+      toast({
+        title: "Failed to send SMS",
+        description: "Please try again or check your phone number",
+        variant: "destructive",
+      });
+
+      console.error('SMS Error:', error);
+    }
   };
 
   const handleTranscriptProcessed = (result: {
@@ -582,7 +625,7 @@ const IndexPage = () => {
             />
             <input
               type="text"
-              placeholder="Child’s Name (optional)"
+              placeholder="Child's Name (optional)"
               value={childForSms}
               onChange={e => setChildForSms(e.target.value)}
               className="w-full p-2 border rounded"
@@ -602,12 +645,6 @@ const IndexPage = () => {
                 {smsStatus === 'sending' ? 'Sending…' : 'Yes, send SMS'}
               </button>
             </div>
-            {smsStatus === 'sent' && (
-              <p className="text-green-600">✅ SMS sent!</p>
-            )}
-            {smsStatus === 'error' && (
-              <p className="text-red-600">❌ Failed to send SMS</p>
-            )}
           </div>
         </div>
       )}
