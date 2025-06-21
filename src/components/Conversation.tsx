@@ -123,7 +123,9 @@ const ConversationComponent = forwardRef<
 
       const agentId =
         process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID ||
-        'agent_01jy85t07ae65tgp6wbz25dwye'
+        'agent_01jy9010cgfvpszwaxazpwd977'
+
+      console.log('agentId', agentId)
 
       if (!agentId) {
         throw new Error('Agent ID is required but not configured')
