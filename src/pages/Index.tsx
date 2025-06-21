@@ -1,16 +1,67 @@
-
-import { useState } from 'react';
-import { Mic, Heart, Phone, Settings } from 'lucide-react';
+'use client'
+import ConversationComponent, { ConversationHandle } from '@/components/Conversation';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import { Heart, Mic, Phone, Settings } from 'lucide-react';
+import Link from 'next/link';
+import { useRef, useState } from 'react';
 
-const Index = () => {
+const IndexPage = () => {
   const [currentPage, setCurrentPage] = useState('welcome');
   const [isListening, setIsListening] = useState(false);
   const [childName, setChildName] = useState('');
+  const convoRef = useRef<ConversationHandle>(null);
   const [symptoms, setSymptoms] = useState<string[]>([]);
+  const { user } = useAuth();
+  console.log(user)
+  console.log('SUPABASE_URL:', process.env.SUPABASE_URL);
+  console.log('SUPABASE_ANON_KEY:', !!process.env.SUPABASE_ANON_KEY);
+
+  const handleMicToggle = async () => {
+    const connected = convoRef.current?.status === 'connected';
+
+    if (connected) {
+      await convoRef.current?.stop();
+    } else {
+      await convoRef.current?.start();
+    }
+
+    // flip the UI state
+    setIsListening(!isListening);
+    setIsListening(!connected);
+  };
+
 
   const WelcomePage = () => (
-    <div className="min-h-screen bg-gradient-to-br from-sky-200 via-purple-100 to-yellow-100 flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-gradient-to-br from-sky-200 via-purple-100 to-yellow-100 flex flex-col gap-40 items p-6">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+
+        </div>
+        <h2 className="text-2xl font-bold text-purple-800">{user && (<span>{user.user_metadata.full_name}</span>)}</h2>
+        {user ? (
+          // Show Settings button when user is signed in
+          <Link href="/settings">
+            <Button className="text-purple-600 bg-transparent transition-all duration-300">
+              <Settings className="w-5 h-5" />
+            </Button>
+          </Link>
+        ) : (
+          // Show Login/Sign up button when user is not signed in
+          <div className="flex gap-2">
+            <Link href="/auth?mode=login">
+              <Button variant="outline" size="sm" className="text-purple-600">
+                Login
+              </Button>
+            </Link>
+            <Link href="/auth?mode=signup">
+              <Button size="sm" className="bg-purple-600 text-white">
+                Sign Up
+              </Button>
+            </Link>
+          </div>
+        )}
+      </div>
       <div className="text-center space-y-8 max-w-md mx-auto">
         {/* Animated Avatar */}
         <div className="relative">
@@ -36,7 +87,7 @@ const Index = () => {
         </div>
 
         {/* Main Action Button */}
-        <Button 
+        <Button
           onClick={() => setCurrentPage('talk')}
           className="w-full h-16 text-xl font-bold bg-gradient-to-r from-green-400 to-blue-500 hover:from-green-500 hover:to-blue-600 text-white rounded-3xl shadow-lg transform hover:scale-105 transition-all duration-200"
         >
@@ -46,7 +97,7 @@ const Index = () => {
 
         {/* Parent Section */}
         <div className="pt-8 border-t border-purple-200">
-          <Button 
+          <Button
             variant="ghost"
             onClick={() => setCurrentPage('summary')}
             className="text-purple-600 hover:text-purple-800 text-sm"
@@ -62,7 +113,7 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-mint-200 via-blue-100 to-purple-100 flex flex-col p-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
-        <Button 
+        <Button
           variant="ghost"
           onClick={() => setCurrentPage('welcome')}
           className="text-purple-600"
@@ -85,24 +136,24 @@ const Index = () => {
         </div>
 
         {/* Speech Bubble */}
+        <ConversationComponent ref={convoRef} />
         <div className="bg-white rounded-3xl p-6 shadow-lg max-w-sm mx-auto relative">
           <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-white rotate-45"></div>
           <p className="text-lg text-gray-700 text-center font-medium">
-            {isListening 
-              ? "I'm listening carefully... 👂" 
+            {isListening
+              ? "I'm listening carefully... 👂"
               : "Hi there! How are you feeling today? Tap the button and tell me!"
             }
           </p>
         </div>
 
         {/* Microphone Button */}
-        <Button 
-          onClick={() => setIsListening(!isListening)}
-          className={`w-24 h-24 rounded-full shadow-xl transition-all duration-300 ${
-            isListening 
-              ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
-              : 'bg-green-500 hover:bg-green-600'
-          }`}
+        <Button
+          onClick={handleMicToggle}
+          className={`w-24 h-24 rounded-full shadow-xl transition-all duration-300 ${isListening
+            ? 'bg-red-500 hover:bg-red-600 animate-pulse'
+            : 'bg-green-500 hover:bg-green-600'
+            }`}
         >
           <Mic className="w-8 h-8 text-white" />
         </Button>
@@ -126,7 +177,7 @@ const Index = () => {
 
         {/* Continue Button */}
         {symptoms.length > 0 && (
-          <Button 
+          <Button
             onClick={() => setCurrentPage('summary')}
             className="w-full max-w-sm h-12 bg-purple-500 hover:bg-purple-600 text-white rounded-2xl font-bold"
           >
@@ -141,7 +192,7 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-green-100 via-blue-100 to-purple-100 p-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
-        <Button 
+        <Button
           variant="ghost"
           onClick={() => setCurrentPage('talk')}
           className="text-purple-600"
@@ -149,9 +200,11 @@ const Index = () => {
           ← Back
         </Button>
         <h2 className="text-2xl font-bold text-purple-800">Health Summary</h2>
-        <Button variant="ghost" className="text-purple-600">
-          <Settings className="w-5 h-5" />
-        </Button>
+        <Link href="/settings">
+          <Button className="text-purple-600 bg-transparent transition-all duration-300">
+            <Settings className="w-5 h-5" />
+          </Button>
+        </Link>
       </div>
 
       {/* Summary Card */}
@@ -202,7 +255,7 @@ const Index = () => {
 
         {/* Action Buttons */}
         <div className="space-y-4">
-          <Button 
+          <Button
             onClick={() => {
               setSymptoms([]);
               setCurrentPage('talk');
@@ -213,7 +266,7 @@ const Index = () => {
             Send Another Report
           </Button>
 
-          <Button 
+          <Button
             variant="outline"
             onClick={() => setCurrentPage('welcome')}
             className="w-full h-12 border-2 border-purple-300 text-purple-700 rounded-2xl font-medium hover:bg-purple-50"
@@ -244,4 +297,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default IndexPage;

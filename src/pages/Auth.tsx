@@ -1,21 +1,24 @@
-
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+'use client'
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
-const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+const AuthPage = () => {
+  const searchParams = useSearchParams();
+  const mode = searchParams.get('mode')
+  const [isLogin, setIsLogin] = useState(mode!== 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +40,7 @@ const Auth = () => {
         });
       } else {
         if (isLogin) {
-          navigate('/');
+          router.push('/');
         } else {
           toast({
             title: "Success",
@@ -55,6 +58,10 @@ const Auth = () => {
       setLoading(false);
     }
   };
+
+  useEffect(()=>{
+    setIsLogin(mode !== 'signup');
+  },[mode])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-200 via-purple-100 to-yellow-100 flex items-center justify-center p-6">
@@ -130,4 +137,4 @@ const Auth = () => {
   );
 };
 
-export default Auth;
+export default AuthPage;

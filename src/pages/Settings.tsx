@@ -1,13 +1,15 @@
-
-import { useState, useEffect } from 'react';
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+'use client'
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, User, Phone, Baby } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { ArrowLeft, Baby, User } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 interface Profile {
   id: string;
@@ -28,10 +30,10 @@ interface Conversation {
   created_at: string;
 }
 
-const Settings = () => {
+const SettingsPage = () => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,7 +118,7 @@ const Settings = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/auth');
+    router.push('/auth');
   };
 
   if (loading) {
@@ -134,7 +136,7 @@ const Settings = () => {
         <div className="flex items-center justify-between">
           <Button
             variant="ghost"
-            onClick={() => navigate('/')}
+            onClick={() => router.push('/')}
             className="text-purple-600"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
@@ -174,7 +176,7 @@ const Settings = () => {
                 id="fullName"
                 type="text"
                 value={profile?.full_name || ''}
-                onChange={(e) => setProfile(prev => prev ? {...prev, full_name: e.target.value} : null)}
+                onChange={(e) => setProfile(prev => prev ? { ...prev, full_name: e.target.value } : null)}
               />
             </div>
 
@@ -184,7 +186,7 @@ const Settings = () => {
                 id="childName"
                 type="text"
                 value={profile?.child_name || ''}
-                onChange={(e) => setProfile(prev => prev ? {...prev, child_name: e.target.value} : null)}
+                onChange={(e) => setProfile(prev => prev ? { ...prev, child_name: e.target.value } : null)}
               />
             </div>
 
@@ -194,7 +196,7 @@ const Settings = () => {
                 id="childAge"
                 type="number"
                 value={profile?.child_age || ''}
-                onChange={(e) => setProfile(prev => prev ? {...prev, child_age: parseInt(e.target.value)} : null)}
+                onChange={(e) => setProfile(prev => prev ? { ...prev, child_age: parseInt(e.target.value) } : null)}
               />
             </div>
 
@@ -204,7 +206,7 @@ const Settings = () => {
                 id="phone"
                 type="tel"
                 value={profile?.caregiver_phone || ''}
-                onChange={(e) => setProfile(prev => prev ? {...prev, caregiver_phone: e.target.value} : null)}
+                onChange={(e) => setProfile(prev => prev ? { ...prev, caregiver_phone: e.target.value } : null)}
               />
             </div>
 
@@ -239,7 +241,7 @@ const Settings = () => {
                       {new Date(conversation.created_at).toLocaleDateString()}
                     </span>
                   </div>
-                  
+
                   {conversation.symptoms && conversation.symptoms.length > 0 && (
                     <div className="mb-2">
                       <p className="text-sm text-gray-600">
@@ -247,7 +249,7 @@ const Settings = () => {
                       </p>
                     </div>
                   )}
-                  
+
                   {conversation.summary && (
                     <div className="mb-2">
                       <p className="text-sm text-gray-600">
@@ -255,7 +257,7 @@ const Settings = () => {
                       </p>
                     </div>
                   )}
-                  
+
                   {conversation.sent_to && (
                     <div>
                       <p className="text-sm text-gray-600">
@@ -273,4 +275,4 @@ const Settings = () => {
   );
 };
 
-export default Settings;
+export default SettingsPage;
